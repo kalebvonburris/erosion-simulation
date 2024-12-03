@@ -2,22 +2,6 @@ use std::sync::{Arc, RwLock};
 
 use nalgebra::Vector2;
 
-/// Gravity Constant - how much the `Raindrop` is pulled down.
-/// This affects the speed/momentum of the `Raindrop`, and therefore
-/// its carrying capacity on slopes.
-const GRAVITY: f32 = 10.0;
-/// Carrying capcity of the `Raindrop` - how much sediment it can carry.
-const CAPACITY: f32 = 2.0;
-const INERTIA: f32 = 0.1;
-const EROSION_FACTOR: f32 = 0.1;
-const DESPOSITION_FACTOR: f32 = 0.1;
-/// The diameter of the `Raindrop` - how much area it covers.
-/// This should almost always be >= 3.0, otherwise we get weird
-/// artifacts and terrible simulation.
-const DIAMETER: f32 = 3.0;
-const LIFETIME: usize = 30;
-const STARTING_MASS: f32 = 1.0;
-
 #[derive(Debug)]
 pub struct Raindrop {
     // The mass contained by the drop
@@ -36,10 +20,10 @@ pub struct Raindrop {
 
 impl Raindrop {
     /// Create a new Raindrop with the given mass
-    pub fn new(x: f32, y: f32) -> Self {
+    pub fn new(starting_mass: f32, x: f32, y: f32) -> Self {
         Raindrop {
             sediment: 0.0,
-            water: STARTING_MASS,
+            water: starting_mass,
             position: Vector2::new(x, y),
             velocity: 1.0,
             direction: Vector2::new(0.0, 0.0),
@@ -62,16 +46,23 @@ impl Raindrop {
         &mut self,
         texture: Arc<RwLock<Vec<f32>>>,
         dims: (usize, usize),
+        gravity: f32,
+        capacity: f32,
+        inertia: f32,
+        erosion_factor: f32,
+        deposition_factor: f32,
+        diameter: f32,
+        lifetime: u32,
     ) -> Vec<(f32, usize)> {
         // Create a vector to store changes
         let mut changes = Vec::with_capacity(
-            (DIAMETER.powi(2) * std::f32::consts::PI / 4.0).ceil() as usize * LIFETIME,
+            (diameter.powi(2) * std::f32::consts::PI / 4.0).ceil() as usize * lifetime as usize,
         );
 
         // Grab a read lock on the texture
         let texture = texture.read().unwrap();
 
-        for _ in 0..LIFETIME {
+        for _ in 0..lifetime {
             // Store current position for later
             let prev_x = self.position.x;
             let prev_y = self.position.y;
@@ -82,25 +73,25 @@ impl Raindrop {
 
             // Find the new direction of the Raindrop - normalize so we only step exactly 1 unit
             self.direction =
-                ((self.direction * INERTIA) - (gradient * (1.0 - INERTIA))).normalize();
+                ((self.direction * inertia) - (gradient * (1.0 - inertia))).normalize();
 
             // Set the droplet to the new position
             self.position += self.direction;
 
             // If the Raindrop is out of bounds, reflect it
             if self.position.x >= (dims.0 - 1) as f32 {
-                self.kill(dims);
+                self.kill(dims, diameter);
                 break;
             } else if self.position.x < 0.0 {
-                self.kill(dims);
+                self.kill(dims, diameter);
                 break;
             }
             // Reflection for y case
             if self.position.y >= (dims.1 - 1) as f32 {
-                self.kill(dims);
+                self.kill(dims, diameter);
                 break;
             } else if self.position.y < 0.0 {
-                self.kill(dims);
+                self.kill(dims, diameter);
                 break;
             }
 
@@ -110,40 +101,40 @@ impl Raindrop {
             // Get the height difference
             let diff = height - starting_height;
             // Calculate the 'c' sediment capacity
-            let sediment_capacity = (-diff).min(0.05) * self.velocity * self.water * CAPACITY;
+            let sediment_capacity = (-diff).min(0.05) * self.velocity * self.water * capacity;
 
             if self.sediment > sediment_capacity || diff > 0.0 {
                 // If we carry more sediment than the capacity or are moving downhill, deposit it
                 let deposit = if diff > 0.0 {
                     diff.min(self.sediment)
                 } else {
-                    (self.sediment - sediment_capacity) * DESPOSITION_FACTOR
+                    (self.sediment - sediment_capacity) * deposition_factor
                 };
 
                 changes.append(&mut self.erode_deposit(
                     dims,
                     Vector2::new(prev_x, prev_y),
-                    DIAMETER,
+                    diameter,
                     deposit,
                 ));
             } else {
                 // Erode the sediment
                 // Use a negative value to indicate erosion
-                let deposit = -((sediment_capacity - self.sediment) * EROSION_FACTOR).min(-diff);
+                let deposit = -((sediment_capacity - self.sediment) * erosion_factor).min(-diff);
                 changes.append(&mut self.erode_deposit(
                     dims,
                     Vector2::new(prev_x, prev_y),
-                    DIAMETER,
+                    diameter,
                     deposit,
                 ));
             }
 
             // Calculate the new velocity
-            self.velocity = (self.velocity.powi(2) + diff * GRAVITY).sqrt().max(0.0001);
+            self.velocity = (self.velocity.powi(2) + diff * gravity).sqrt().max(0.0001);
             self.water *= 0.99;
 
             if self.velocity <= 0.01 {
-                self.kill(dims);
+                self.kill(dims, diameter);
                 break;
             }
         }
@@ -258,9 +249,9 @@ impl Raindrop {
     /// Kills the `Raindrop`.
     ///
     /// This is a separate function because there may need to be additional logic.
-    pub fn kill(&mut self, dims: (usize, usize)) {
+    pub fn kill(&mut self, dims: (usize, usize), diameter: f32) {
         self.alive = false;
-        self.erode_deposit(dims, self.position, DIAMETER, self.sediment);
+        self.erode_deposit(dims, self.position, diameter, self.sediment);
     }
 }
 

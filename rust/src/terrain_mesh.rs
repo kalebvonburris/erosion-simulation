@@ -32,13 +32,43 @@ lazy_static! {
 #[class(base=MeshInstance3D)]
 struct TerrainMesh {
     base: Base<MeshInstance3D>,
+    #[var]
+    gravity: f32,
+    /// Carrying capcity of the `Raindrop` - how much sediment it can carry.
+    #[var]
+    capacity: f32,
+    #[var]
+    inertia: f32,
+    #[var]
+    erosion_factor: f32,
+    #[var]
+    deposition_factor: f32,
+    /// The diameter of the `Raindrop` - how much area it covers.
+    /// This should almost always be >= 3.0, otherwise we get weird
+    /// artifacts and terrible simulation.
+    #[var]
+    diameter: f32,
+    #[var]
+    lifetime: u32,
+    #[var]
+    starting_mass: f32,
 }
 
 #[godot_api]
 impl IMeshInstance3D for TerrainMesh {
     fn init(base: Base<MeshInstance3D>) -> Self {
         godot_print!("Hello, world!"); // Prints to the Godot console
-        Self { base }
+        Self { 
+            base,
+            gravity: 10.0,
+            capacity: 2.0,
+            inertia: 0.1,
+            erosion_factor: 0.1,
+            deposition_factor: 0.1,
+            diameter: 3.0,
+            lifetime: 30,
+            starting_mass: 1.0,
+        }
     }
 
     fn ready(&mut self) {
@@ -66,7 +96,7 @@ impl IMeshInstance3D for TerrainMesh {
                 godot_print!("{:?}", data.len());
 
                 let mut converted: Vec<f32> = data
-                    .chunks_exact(2)
+                    .chunks_exact(4)
                     .map(TryInto::try_into)
                     .map(Result::unwrap)
                     .map(f32::from_le_bytes)
@@ -115,7 +145,7 @@ impl IMeshInstance3D for TerrainMesh {
                 );
 
                 // Create a new texture
-                let new_image = Image::create_from_data(x, y, false, Format::RH, &array).unwrap();
+                let new_image = Image::create_from_data(x, y, false, Format::RF, &array).unwrap();
 
                 let new_texture = ImageTexture::create_from_image(&new_image).unwrap();
 
@@ -178,6 +208,16 @@ impl TerrainMesh {
             return;
         }
 
+        // Get all data for the thread
+        let gravity = self.gravity;
+        let capacity = self.capacity;
+        let inertia = self.inertia;
+        let erosion_factor = self.erosion_factor;
+        let deposition_factor = self.deposition_factor;
+        let diameter = self.diameter;
+        let lifetime = self.lifetime;
+        let starting_mass = self.starting_mass;
+
         let (sender, reciever) = channel::<()>();
 
         *thread = Some((
@@ -209,13 +249,22 @@ impl TerrainMesh {
                     }
 
                     // Create Raindrops
-                    let mut drops: Vec<Raindrop> = create_raindrops(20_000, *DIMS.read().unwrap());
+                    let mut drops: Vec<Raindrop> = create_raindrops(20_000, starting_mass, *DIMS.read().unwrap());
 
                     // Simulate Raindrops
                     // Using the map function - add/remove the `par_` to add/remove parallelism
                     let changes: Vec<(f32, usize)> = drops
                         .par_iter_mut()
-                        .map(|drop| drop.simulate(Arc::clone(&texture_arc), *DIMS.read().unwrap()))
+                        .map(|drop| drop.simulate(
+                            Arc::clone(&texture_arc), *DIMS.read().unwrap(),
+                            gravity,
+                            capacity,
+                            inertia,
+                            erosion_factor,
+                            deposition_factor,
+                            diameter,
+                            lifetime,
+                        ))
                         .flatten()
                         .collect();
 
@@ -255,7 +304,7 @@ impl TerrainMesh {
                 // Output the image
                 write_rgb_file("output.exr", dims.0, dims.1, |x, y| {
                     let index = y * dims.0 + x;
-                    let r = texture_lock[index] as f32;
+                    let r = texture_lock[index];
 
                     (r, r, r)
                 })
@@ -291,7 +340,7 @@ fn update_texture(texture: &[f32], dims: (i32, i32), image_id: Rid, rs: &mut Gd<
     );
 
     // Create a new Image from the texture data
-    let image = Image::create_from_data(dims.0, dims.1, false, Format::RH, &array).unwrap();
+    let image = Image::create_from_data(dims.0, dims.1, false, Format::RF, &array).unwrap();
 
     // Update the texture using a RenderingServer singleton
     rs.texture_2d_update(image_id, &image, 0);

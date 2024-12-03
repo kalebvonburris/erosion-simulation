@@ -70,7 +70,6 @@ mesh = SubResource("PlaneMesh_wycad")
 
 [node name="WaterLevel" type="MeshInstance3D" parent="MeshInstance3D"]
 transform = Transform3D(1, 0, 0, 0, 1, -1.06581e-14, 0, 1.06581e-14, 1, 0, 0, 0)
-visible = false
 mesh = SubResource("PlaneMesh_k4t01")
 skeleton = NodePath("../..")
 
@@ -91,11 +90,12 @@ material = SubResource("CanvasItemMaterial_iba1j")
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -73.5
+offset_left = -134.5
 offset_top = 25.0
-offset_right = 73.5
+offset_right = 88.5
 offset_bottom = 76.0
 grow_horizontal = 2
+size_flags_horizontal = 2
 alignment = 1
 
 [node name="Start Button" type="Button" parent="Camera3D/Sprite3D/BoxContainer"]
