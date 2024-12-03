@@ -1,0 +1,119 @@
+[gd_scene load_steps=12 format=3 uid="uid://cgtsuocj3f2qw"]
+
+[ext_resource type="Script" path="res://physics_button_start.gd" id="1_4w1im"]
+[ext_resource type="Shader" path="res://water_shader.gdshader" id="2_8d81n"]
+[ext_resource type="Script" path="res://physics_button_stop.gd" id="3_1qk1n"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_wycad"]
+subdivide_width = 2000
+subdivide_depth = 2000
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_byicb"]
+render_priority = 0
+shader = ExtResource("2_8d81n")
+shader_parameter/absorption_color = Color(1, 0.35, 0, 1)
+shader_parameter/fresnel_radius = 2.0
+shader_parameter/fresnel_color = Color(0, 0.57, 0.72, 1)
+shader_parameter/roughness = 0.15
+shader_parameter/specular = 0.25
+shader_parameter/depth_distance = 25.0
+shader_parameter/beers_law = 4.5
+shader_parameter/displacement_strength = 0.3
+shader_parameter/displacement_scroll_speed = 0.1
+shader_parameter/displacement_scroll_offset = Vector2(-0.2, 0.3)
+shader_parameter/displacement_scale_offset = 0.5
+shader_parameter/displacement_scale = Vector2(0.04, 0.04)
+shader_parameter/edge_thickness = 0.005
+shader_parameter/edge_speed = 0.351
+shader_parameter/edge_noise_scale = Vector2(2, 2)
+shader_parameter/influence_size = 0.0
+shader_parameter/player_wave_frequenzy = 0.0
+shader_parameter/player_wave_speed = 0.0
+shader_parameter/caustic_size = 0.1
+shader_parameter/caustic_range = 56.6
+shader_parameter/caustic_strength = 0.03
+shader_parameter/ssr_mix_strength = 0.65
+shader_parameter/ssr_travel = 100.0
+shader_parameter/ssr_resolution_near = 1.0
+shader_parameter/ssr_resolution_far = 5.0
+shader_parameter/ssr_tolerance = 1.0
+shader_parameter/refraction_strength = 1.25
+shader_parameter/normal_map_strength = 1.0
+shader_parameter/scroll_speed = 0.3
+shader_parameter/scroll_offset = Vector2(0.1, -0.3)
+shader_parameter/scale_offset = 0.5
+shader_parameter/normal_map_scale = Vector2(0.1, 0.1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_k4t01"]
+material = SubResource("ShaderMaterial_byicb")
+center_offset = Vector3(0, 0.31, 0)
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_q7pvq"]
+
+[sub_resource type="Sky" id="Sky_8nvry"]
+sky_material = SubResource("ProceduralSkyMaterial_q7pvq")
+
+[sub_resource type="Environment" id="Environment_640fp"]
+background_mode = 2
+sky = SubResource("Sky_8nvry")
+
+[sub_resource type="ViewportTexture" id="ViewportTexture_fy17l"]
+viewport_path = NodePath("Camera3D/SubViewport")
+
+[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_iba1j"]
+
+[node name="Node3D" type="Node3D"]
+
+[node name="MeshInstance3D" type="TerrainMesh" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 1.06581e-14, 0, -1.06581e-14, 1, 0, 0, 0)
+mesh = SubResource("PlaneMesh_wycad")
+
+[node name="WaterLevel" type="MeshInstance3D" parent="MeshInstance3D"]
+transform = Transform3D(1, 0, 0, 0, 1, -1.06581e-14, 0, 1.06581e-14, 1, 0, 0, 0)
+visible = false
+mesh = SubResource("PlaneMesh_k4t01")
+skeleton = NodePath("../..")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(-1.83727e-07, 0.707107, -0.707107, 2.53765e-08, 0.707107, 0.707107, 1, 1.11971e-07, -1.47859e-07, -2, 2, 0)
+environment = SubResource("Environment_640fp")
+fov = 65.3
+
+[node name="Sprite3D" type="Sprite3D" parent="Camera3D"]
+transform = Transform3D(1, 2.84217e-14, -2.84217e-14, -7.10543e-15, 1, -1.65558e-14, 0, -1.65558e-14, 1, -8.47896e-08, 0.0285751, -0.551811)
+pixel_size = 0.0005
+billboard = 1
+no_depth_test = true
+texture = SubResource("ViewportTexture_fy17l")
+
+[node name="BoxContainer" type="BoxContainer" parent="Camera3D/Sprite3D"]
+material = SubResource("CanvasItemMaterial_iba1j")
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -73.5
+offset_top = 25.0
+offset_right = 73.5
+offset_bottom = 76.0
+grow_horizontal = 2
+alignment = 1
+
+[node name="Start Button" type="Button" parent="Camera3D/Sprite3D/BoxContainer"]
+layout_mode = 2
+text = "Start Physics!"
+script = ExtResource("1_4w1im")
+
+[node name="Stop Button" type="Button" parent="Camera3D/Sprite3D/BoxContainer"]
+layout_mode = 2
+text = "Stop Physics!"
+script = ExtResource("3_1qk1n")
+
+[node name="SubViewport" type="SubViewport" parent="Camera3D"]
+transparent_bg = true
+size = Vector2i(1920, 1080)
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -0.5, 0.866025, 0, -0.866025, -0.5, 0, 3.84463, 0)
+
+[connection signal="pressed" from="Camera3D/Sprite3D/BoxContainer/Start Button" to="Camera3D/Sprite3D/BoxContainer/Start Button" method="_on_pressed"]
+[connection signal="pressed" from="Camera3D/Sprite3D/BoxContainer/Stop Button" to="Camera3D/Sprite3D/BoxContainer/Stop Button" method="_on_pressed"]

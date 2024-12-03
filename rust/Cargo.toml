@@ -1,0 +1,28 @@
+[package]
+name = "erosion-simulation-lib"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]  # Compile this crate to a dynamic C library.
+
+[dependencies]
+lazy_static = "1.5.0"
+rand = "0.8.5"
+getrandom = { version = "0.2.3", optional = true }
+nalgebra = "0.33.2"
+rayon = "1.10.0"
+exr = "1.73.0"
+
+[dependencies.godot]
+version = "0.2.0"
+
+[profile.release]
+# lto = true
+# codegen-units = 1
+# stip = true
+
+
+[features]
+# Web in case I want to go through the agony of doing that
+web = ["godot/experimental-wasm", "godot/lazy-function-tables", "getrandom", "getrandom/js"]
