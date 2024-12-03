@@ -62,11 +62,11 @@ impl IMeshInstance3D for TerrainMesh {
             base,
             gravity: 10.0,
             capacity: 2.0,
-            inertia: 0.1,
-            erosion_factor: 0.1,
-            deposition_factor: 0.1,
+            inertia: 0.3,
+            erosion_factor: 0.3,
+            deposition_factor: 0.3,
             diameter: 3.0,
-            lifetime: 30,
+            lifetime: 50,
             starting_mass: 1.0,
         }
     }

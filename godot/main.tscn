@@ -5,8 +5,8 @@
 [ext_resource type="Script" path="res://physics_button_stop.gd" id="3_1qk1n"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_wycad"]
-subdivide_width = 2000
-subdivide_depth = 2000
+subdivide_width = 2048
+subdivide_depth = 2048
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_byicb"]
 render_priority = 0
@@ -70,6 +70,7 @@ mesh = SubResource("PlaneMesh_wycad")
 
 [node name="WaterLevel" type="MeshInstance3D" parent="MeshInstance3D"]
 transform = Transform3D(1, 0, 0, 0, 1, -1.06581e-14, 0, 1.06581e-14, 1, 0, 0, 0)
+visible = false
 mesh = SubResource("PlaneMesh_k4t01")
 skeleton = NodePath("../..")
 

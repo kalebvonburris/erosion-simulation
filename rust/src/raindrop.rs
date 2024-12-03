@@ -101,7 +101,7 @@ impl Raindrop {
             // Get the height difference
             let diff = height - starting_height;
             // Calculate the 'c' sediment capacity
-            let sediment_capacity = (-diff).min(0.05) * self.velocity * self.water * capacity;
+            let sediment_capacity = (-diff).min(0.01) * self.velocity * self.water * capacity;
 
             if self.sediment > sediment_capacity || diff > 0.0 {
                 // If we carry more sediment than the capacity or are moving downhill, deposit it
@@ -131,7 +131,9 @@ impl Raindrop {
 
             // Calculate the new velocity
             self.velocity = (self.velocity.powi(2) + diff * gravity).sqrt().max(0.0001);
-            self.water *= 0.99;
+
+            // Evaporate 2% of the water
+            self.water *= 0.98;
 
             if self.velocity <= 0.01 {
                 self.kill(dims, diameter);
