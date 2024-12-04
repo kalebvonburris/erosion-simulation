@@ -12,7 +12,7 @@ struct ErosionExtension;
 unsafe impl ExtensionLibrary for ErosionExtension {}
 
 /// Creates Raindrops at random points on the terrain
-fn create_raindrops(num: usize, mass: f32, dims: (usize, usize)) -> Vec<Raindrop> {
+fn create_raindrops(num: usize, mass: f16, dims: (usize, usize)) -> Vec<Raindrop> {
     let mut drops: Vec<Raindrop> = Vec::with_capacity(num);
 
     while drops.len() < num {

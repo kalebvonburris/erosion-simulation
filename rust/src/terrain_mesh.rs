@@ -22,7 +22,7 @@ use crate::raindrop::Raindrop;
 lazy_static! {
     static ref IMAGE_ID: RwLock<Rid> = RwLock::new(Rid::new(0));
     static ref DIMS: RwLock<(usize, usize)> = RwLock::new((0, 0));
-    static ref TEXTURE: RwLock<Vec<f32>> = RwLock::new(Vec::with_capacity(0));
+    static ref TEXTURE: RwLock<Vec<f16>> = RwLock::new(Vec::with_capacity(0));
     static ref THREAD: Mutex<Option<(std::thread::JoinHandle<()>, Sender<()>)>> = Mutex::new(None);
     static ref MOUSE_POS: RwLock<Vector2> = RwLock::new(Vector2::new(0.0, 0.0));
     static ref DRAGGING: RwLock<bool> = RwLock::new(false);
@@ -95,26 +95,19 @@ impl IMeshInstance3D for TerrainMesh {
 
                 godot_print!("{:?}", data.len());
 
-                let mut converted: Vec<f32> = data
-                    .chunks_exact(4)
+                let mut converted: Vec<f16> = data
+                    .chunks_exact(2)
                     .map(TryInto::try_into)
                     .map(Result::unwrap)
-                    .map(f32::from_le_bytes)
+                    .map(f16::from_le_bytes)
                     .collect();
-
-                godot_print!("{:?}", converted.len());
-
-                if data.len() < (x * y * 4).try_into().unwrap() {
-                    godot_error!("Data length is less than expected");
-                    return;
-                }
 
                 let image_format = base_texture.get_image().unwrap().get_format();
 
                 let bytes_to_skip = match image_format {
-                    Format::RGF => 2,
-                    Format::RGBF => 3,
-                    Format::RGBAF => 4,
+                    Format::RGH => 2,
+                    Format::RGBH => 3,
+                    Format::RGBAH => 4,
                     _ => {
                         godot_error!("Unsupported image format: {:?}", image_format);
                         return;
@@ -145,7 +138,7 @@ impl IMeshInstance3D for TerrainMesh {
                 );
 
                 // Create a new texture
-                let new_image = Image::create_from_data(x, y, false, Format::RF, &array).unwrap();
+                let new_image = Image::create_from_data(x, y, false, Format::RH, &array).unwrap();
 
                 let new_texture = ImageTexture::create_from_image(&new_image).unwrap();
 
@@ -209,14 +202,14 @@ impl TerrainMesh {
         }
 
         // Get all data for the thread
-        let gravity = self.gravity;
-        let capacity = self.capacity;
+        let capacity = self.capacity as f16;
+        let gravity = self.gravity as f16;
         let inertia = self.inertia;
-        let erosion_factor = self.erosion_factor;
-        let deposition_factor = self.deposition_factor;
         let diameter = self.diameter;
+        let erosion_factor = self.erosion_factor as f16;
+        let deposition_factor = self.deposition_factor as f16;
         let lifetime = self.lifetime;
-        let starting_mass = self.starting_mass;
+        let starting_mass = self.starting_mass as f16;
 
         let (sender, reciever) = channel::<()>();
 
@@ -253,7 +246,7 @@ impl TerrainMesh {
 
                     // Simulate Raindrops
                     // Using the map function - add/remove the `par_` to add/remove parallelism
-                    let changes: Vec<(f32, usize)> = drops
+                    let changes: Vec<(f16, usize)> = drops
                         .par_iter_mut()
                         .map(|drop| drop.simulate(
                             Arc::clone(&texture_arc), *DIMS.read().unwrap(),
@@ -276,6 +269,12 @@ impl TerrainMesh {
                         texture[change.1] += change.0;
                     }
 
+                    // Get the end time for iteration speed testing
+                    let duration = SystemTime::now().duration_since(start).unwrap();
+                    godot_print!(
+                        "Iteration {counter} took: {duration:?}, to calculate the changes."
+                    );
+
                     // Update the texture in Godot
                     update_texture(
                         &texture,
@@ -286,10 +285,9 @@ impl TerrainMesh {
                     counter += 1;
 
                     // Get the end time for iteration speed testing
-                    let end = SystemTime::now();
-                    let duration = end.duration_since(start).unwrap();
+                    let duration = SystemTime::now().duration_since(start).unwrap();
                     godot_print!(
-                        "Iteration {counter} took: {duration:?}, made {} changes",
+                        "Iteration {counter} took: {duration:?}, made {} changes.",
                         changes.len()
                     );
                 }
@@ -299,12 +297,12 @@ impl TerrainMesh {
 
                 // Import here, otherwise we get weird errors :|
                 // I think this is due to exr having traits that effect Vectors.
-                use exr::prelude::*;
+                use exr::prelude::write_rgb_file;
 
                 // Output the image
                 write_rgb_file("output.exr", dims.0, dims.1, |x, y| {
                     let index = y * dims.0 + x;
-                    let r = texture_lock[index];
+                    let r = texture_lock[index] as f32;
 
                     (r, r, r)
                 })
@@ -329,7 +327,7 @@ impl TerrainMesh {
 }
 
 /// Updates the texture with the new height data
-fn update_texture(texture: &[f32], dims: (i32, i32), image_id: Rid, rs: &mut Gd<RenderingServer>) {
+fn update_texture(texture: &[f16], dims: (i32, i32), image_id: Rid, rs: &mut Gd<RenderingServer>) {
     // Create a new PackedByteArray from the texture data
     let mut array = PackedByteArray::new();
     array.extend(
@@ -340,7 +338,7 @@ fn update_texture(texture: &[f32], dims: (i32, i32), image_id: Rid, rs: &mut Gd<
     );
 
     // Create a new Image from the texture data
-    let image = Image::create_from_data(dims.0, dims.1, false, Format::RF, &array).unwrap();
+    let image = Image::create_from_data(dims.0, dims.1, false, Format::RH, &array).unwrap();
 
     // Update the texture using a RenderingServer singleton
     rs.texture_2d_update(image_id, &image, 0);
