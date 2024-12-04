@@ -5,13 +5,13 @@ use nalgebra::Vector2;
 #[derive(Debug)]
 pub struct Raindrop {
     // The mass contained by the drop
-    pub sediment: f16,
+    pub sediment: f32,
     // How much water the drop contains
-    pub water: f16,
+    pub water: f32,
     // The position of the drop
     pub position: Vector2<f32>,
     // The velocity of the drop
-    velocity: f16,
+    velocity: f32,
     // The direction of the drop
     direction: Vector2<f32>,
     // The state alive/dead state of the droplet
@@ -20,7 +20,7 @@ pub struct Raindrop {
 
 impl Raindrop {
     /// Create a new Raindrop with the given mass
-    pub fn new(starting_mass: f16, x: f32, y: f32) -> Self {
+    pub fn new(starting_mass: f32, x: f32, y: f32) -> Self {
         Raindrop {
             sediment: 0.0,
             water: starting_mass,
@@ -35,25 +35,25 @@ impl Raindrop {
     ///
     /// # Arguments
     ///
-    /// * `texture` - The texture to simulate on as a `&[f16]`.
+    /// * `texture` - The texture to simulate on as a `&[f32]`.
     /// * `dims` - The dimensions of the texture as a tuple of `(x: usize, y: usize)`.
     ///
     /// # Returns
     ///
     /// A vector of tuples containing the amount of material deposited/eroded (based on sign) and the x/y coordinates.
-    /// Contained a the tuple `(material: f16, x: usize, y: usize)`.
+    /// Contained a the tuple `(material: f32, x: usize, y: usize)`.
     pub fn simulate(
         &mut self,
-        texture: Arc<RwLock<Vec<f16>>>,
+        texture: Arc<RwLock<Vec<f32>>>,
         dims: (usize, usize),
-        gravity: f16,
-        capacity: f16,
+        gravity: f32,
+        capacity: f32,
         inertia: f32,
-        erosion_factor: f16,
-        deposition_factor: f16,
+        erosion_factor: f32,
+        deposition_factor: f32,
         diameter: f32,
         lifetime: u32,
-    ) -> Vec<(f16, usize)> {
+    ) -> Vec<(f32, usize)> {
         // Create a vector to store changes
         let mut changes = Vec::with_capacity(
             (diameter.powi(2) * std::f32::consts::PI / 4.0).ceil() as usize * lifetime as usize,
@@ -73,13 +73,7 @@ impl Raindrop {
 
             // Find the new direction of the Raindrop - normalize so we only step exactly 1 unit
             self.direction =
-                (self.direction * inertia) - (gradient * (1.0 - inertia));
-
-            // Normalize the direction - for SIMD reasons, nalgebra doesn't have a normalize function for f16 :(
-            let length = (self.direction.x * self.direction.x + self.direction.y * self.direction.y).sqrt();
-            if length != 0.0 {
-                self.direction /= length;
-            }
+                ((self.direction * inertia) - (gradient * (1.0 - inertia))).normalize();
 
             // Set the droplet to the new position
             self.position += self.direction;
@@ -147,6 +141,12 @@ impl Raindrop {
             }
         }
 
+        // godot_print!(
+        //     "Returning {} changes, {} alloc'd",
+        //     changes.len(),
+        //     changes.capacity()
+        // );
+
         changes
     }
 
@@ -161,7 +161,7 @@ impl Raindrop {
     /// # Returns
     ///
     /// A vector of tuples containing the amount of material deposited/eroded (based on sign) and the x/y coordinates.
-    /// Contained a the tuple `(material: f16, x: usize, y: usize)`.
+    /// Contained a the tuple `(material: f32, x: usize, y: usize)`.
     ///
     /// # Explanation
     ///
@@ -179,8 +179,8 @@ impl Raindrop {
         dims: (usize, usize),
         position: Vector2<f32>,
         diameter: f32,
-        deposit: f16,
-    ) -> Vec<(f16, usize)> {
+        deposit: f32,
+    ) -> Vec<(f32, usize)> {
         // Get the height of the square - rounding up so we don't miss points
         let height = diameter.ceil() as usize;
 
@@ -188,7 +188,7 @@ impl Raindrop {
         //  Each point is a tuple of `(weight, x, y)`.
         // There's some weird alloc capacity - this is because a sphere fills a circle
         //  at a ratio of 4:pi, so we can use an approximation
-        let mut points: Vec<(f16, usize)> =
+        let mut points: Vec<(f32, usize)> =
             Vec::with_capacity((diameter.powi(2) * std::f32::consts::PI / 4.0).ceil() as usize);
 
         // Sum the weights of the points
@@ -221,7 +221,7 @@ impl Raindrop {
                 }
 
                 // We now have a point within the circle - calculate the weight
-                let weight = (1.0 - (distance / (diameter / 2.0))).powi(2) as f16;
+                let weight = (1.0 - (distance / (diameter / 2.0))).powi(2);
 
                 // Push the point and weight to the vector
                 points.push((weight, y as usize * dims.0 + x as usize));
@@ -262,15 +262,15 @@ impl Raindrop {
 /// Returns a tuple containing the height and the 2D gradient vector.
 fn get_height_and_gradient(
     point: Vector2<f32>,
-    texture: &[f16],
+    texture: &[f32],
     dims: (usize, usize),
-) -> (f16, Vector2<f32>) {
+) -> (f32, Vector2<f32>) {
     // Get the index of the grid point - this just makes it cleaner :)
     let texture_index = point.y as usize * dims.0 + point.x as usize;
 
     // Get the u/v offset values from the top right of the grid point
-    let u = point.x.fract() as f16;
-    let v = point.y.fract() as f16;
+    let u = point.x.fract();
+    let v = point.y.fract();
 
     // Get the heights of the four corners of the grid point
     let nw = texture[texture_index];
@@ -280,8 +280,8 @@ fn get_height_and_gradient(
 
     // Calculate the gradient
     let gradient: Vector2<f32> = Vector2::new(
-        (((ne - nw) * (1.0 - v)) + ((se - sw) * v)) as f32,
-        (((sw - nw) * (1.0 - u)) + ((se - ne) * u)) as f32,
+        ((ne - nw) * (1.0 - v)) + ((se - sw) * v),
+        ((sw - nw) * (1.0 - u)) + ((se - ne) * u),
     );
 
     let height =
