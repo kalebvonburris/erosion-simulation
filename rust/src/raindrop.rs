@@ -1,5 +1,6 @@
 use std::sync::{Arc, RwLock};
 
+use godot::global::godot_print;
 use nalgebra::Vector2;
 
 #[derive(Debug)]
@@ -56,7 +57,7 @@ impl Raindrop {
     ) -> Vec<(f32, usize)> {
         // Create a vector to store changes
         let mut changes = Vec::with_capacity(
-            (diameter.powi(2) * std::f32::consts::PI / 4.0).ceil() as usize * lifetime as usize,
+            ((diameter / 2.0).powi(2) * std::f32::consts::PI).ceil() as usize + (diameter * lifetime as f32).ceil() as usize,
         );
 
         // Grab a read lock on the texture
@@ -79,19 +80,8 @@ impl Raindrop {
             self.position += self.direction;
 
             // If the Raindrop is out of bounds, reflect it
-            if self.position.x >= (dims.0 - 1) as f32 {
-                self.kill(dims, diameter);
-                break;
-            } else if self.position.x < 0.0 {
-                self.kill(dims, diameter);
-                break;
-            }
-            // Reflection for y case
-            if self.position.y >= (dims.1 - 1) as f32 {
-                self.kill(dims, diameter);
-                break;
-            } else if self.position.y < 0.0 {
-                self.kill(dims, diameter);
+            if self.position.x >= (dims.0 - 1) as f32 || self.position.x < 0.0 || self.position.y >= (dims.1 - 1) as f32 || self.position.y < 0.0 || self.velocity <= 0.01 {
+                self.kill(dims, diameter, &mut changes);
                 break;
             }
 
@@ -111,22 +101,24 @@ impl Raindrop {
                     (self.sediment - sediment_capacity) * deposition_factor
                 };
 
-                changes.append(&mut self.erode_deposit(
+                self.erode_deposit(
                     dims,
                     Vector2::new(prev_x, prev_y),
                     diameter,
                     deposit,
-                ));
+                    &mut changes,
+                );
             } else {
                 // Erode the sediment
                 // Use a negative value to indicate erosion
                 let deposit = -((sediment_capacity - self.sediment) * erosion_factor).min(-diff);
-                changes.append(&mut self.erode_deposit(
+                self.erode_deposit(
                     dims,
                     Vector2::new(prev_x, prev_y),
                     diameter,
                     deposit,
-                ));
+                    &mut changes,
+                );
             }
 
             // Calculate the new velocity
@@ -134,11 +126,6 @@ impl Raindrop {
 
             // Evaporate 2% of the water
             self.water *= 0.98;
-
-            if self.velocity <= 0.01 {
-                self.kill(dims, diameter);
-                break;
-            }
         }
 
         // godot_print!(
@@ -180,7 +167,8 @@ impl Raindrop {
         position: Vector2<f32>,
         diameter: f32,
         deposit: f32,
-    ) -> Vec<(f32, usize)> {
+        changes: &mut Vec<(f32, usize)>,
+    ) {
         // Get the height of the square - rounding up so we don't miss points
         let height = diameter.ceil() as usize;
 
@@ -189,7 +177,7 @@ impl Raindrop {
         // There's some weird alloc capacity - this is because a sphere fills a circle
         //  at a ratio of 4:pi, so we can use an approximation
         let mut points: Vec<(f32, usize)> =
-            Vec::with_capacity((diameter.powi(2) * std::f32::consts::PI / 4.0).ceil() as usize);
+            Vec::with_capacity(((diameter / 2.0).powi(2) * std::f32::consts::PI).ceil() as usize + 1);
 
         // Sum the weights of the points
         let mut weight_sum = 0.0;
@@ -234,26 +222,30 @@ impl Raindrop {
         // Iterate over the points and deposit material
         // We can use an iter mut to reuse the points vector, saving
         // an entire set of allocations
-        for (weight, _) in points.iter_mut() {
+        for (weight, index) in points.iter() {
             // Calculate the deposit
-            let deposit = deposit * *weight / weight_sum;
+            let weighted_deposit = deposit * *weight / weight_sum;
 
-            // Modify the deposit based on the height
-            *weight = deposit;
+            // Push the change to the changes vector - checking for values with the same index
+            if let Some((deposit, _)) = changes.iter_mut().find(|(_, i)| *i == *index) {
+                // If we find a change, add the deposit to it
+                *deposit += weighted_deposit;
+            } else {
+                // Otherwise, push a new change
+                changes.push((weighted_deposit, *index));
+            }
 
             // Remove sediment from the Raindrop
-            self.sediment -= deposit;
+            self.sediment -= weighted_deposit;
         }
-
-        points
     }
 
     /// Kills the `Raindrop`.
     ///
     /// This is a separate function because there may need to be additional logic.
-    pub fn kill(&mut self, dims: (usize, usize), diameter: f32) {
+    pub fn kill(&mut self, dims: (usize, usize), diameter: f32, changes: &mut Vec<(f32, usize)>) {
         self.alive = false;
-        self.erode_deposit(dims, self.position, diameter, self.sediment);
+        self.erode_deposit(dims, self.position, diameter, self.sediment, changes);
     }
 }
 
