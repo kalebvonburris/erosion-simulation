@@ -1,6 +1,5 @@
 use std::sync::{Arc, RwLock};
 
-use godot::global::godot_print;
 use nalgebra::Vector2;
 
 #[derive(Debug)]
@@ -57,7 +56,8 @@ impl Raindrop {
     ) -> Vec<(f32, usize)> {
         // Create a vector to store changes
         let mut changes = Vec::with_capacity(
-            ((diameter / 2.0).powi(2) * std::f32::consts::PI).ceil() as usize + (diameter * lifetime as f32).ceil() as usize,
+            ((diameter / 2.0).powi(2) * std::f32::consts::PI).ceil() as usize
+                + (diameter * lifetime as f32).ceil() as usize,
         );
 
         // Grab a read lock on the texture
@@ -80,7 +80,12 @@ impl Raindrop {
             self.position += self.direction;
 
             // If the Raindrop is out of bounds, reflect it
-            if self.position.x >= (dims.0 - 1) as f32 || self.position.x < 0.0 || self.position.y >= (dims.1 - 1) as f32 || self.position.y < 0.0 || self.velocity <= 0.01 {
+            if self.position.x >= (dims.0 - 1) as f32
+                || self.position.x < 0.0
+                || self.position.y >= (dims.1 - 1) as f32
+                || self.position.y < 0.0
+                || self.velocity <= 0.01
+            {
                 self.kill(dims, diameter, &mut changes);
                 break;
             }
@@ -176,8 +181,9 @@ impl Raindrop {
         //  Each point is a tuple of `(weight, x, y)`.
         // There's some weird alloc capacity - this is because a sphere fills a circle
         //  at a ratio of 4:pi, so we can use an approximation
-        let mut points: Vec<(f32, usize)> =
-            Vec::with_capacity(((diameter / 2.0).powi(2) * std::f32::consts::PI).ceil() as usize + 1);
+        let mut points: Vec<(f32, usize)> = Vec::with_capacity(
+            ((diameter / 2.0).powi(2) * std::f32::consts::PI).ceil() as usize + 1,
+        );
 
         // Sum the weights of the points
         let mut weight_sum = 0.0;

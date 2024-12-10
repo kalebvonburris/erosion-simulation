@@ -58,7 +58,7 @@ struct TerrainMesh {
 impl IMeshInstance3D for TerrainMesh {
     fn init(base: Base<MeshInstance3D>) -> Self {
         godot_print!("Hello, world!"); // Prints to the Godot console
-        Self { 
+        Self {
             base,
             gravity: 10.0,
             capacity: 2.0,
@@ -249,22 +249,26 @@ impl TerrainMesh {
                     }
 
                     // Create Raindrops
-                    let mut drops: Vec<Raindrop> = create_raindrops(20_000, starting_mass, *DIMS.read().unwrap());
+                    let mut drops: Vec<Raindrop> =
+                        create_raindrops(20_000, starting_mass, *DIMS.read().unwrap());
 
                     // Simulate Raindrops
                     // Using the map function - add/remove the `par_` to add/remove parallelism
                     let changes: Vec<(f32, usize)> = drops
                         .par_iter_mut()
-                        .map(|drop| drop.simulate(
-                            Arc::clone(&texture_arc), *DIMS.read().unwrap(),
-                            gravity,
-                            capacity,
-                            inertia,
-                            erosion_factor,
-                            deposition_factor,
-                            diameter,
-                            lifetime,
-                        ))
+                        .map(|drop| {
+                            drop.simulate(
+                                Arc::clone(&texture_arc),
+                                *DIMS.read().unwrap(),
+                                gravity,
+                                capacity,
+                                inertia,
+                                erosion_factor,
+                                deposition_factor,
+                                diameter,
+                                lifetime,
+                            )
+                        })
                         .flatten()
                         .collect();
 
